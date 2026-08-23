@@ -1,0 +1,120 @@
+name: Build Windows ROCm
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+env:
+  ROCM_VERSION: "7.14.0"
+
+jobs:
+  windows-rocm:
+    name: windows-rocm (gfx1100 / RX 7900 XTX)
+    runs-on: windows-2022
+
+    permissions:
+      actions: write
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Cache ROCm Installation
+        id: cache-rocm
+        uses: actions/cache@v5
+        with:
+          path: C:\TheRock\build
+          key: rocm-wheels-${{ env.ROCM_VERSION }}-multi-arch-${{ runner.os }}
+
+      - name: Install ROCm with Wheels
+        if: steps.cache-rocm.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
+          python -m venv C:\TheRock\build\.venv
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          # Install ROCm wheels for multi-arch support (this may take several minutes)
+          python -m pip install --index-url https://repo.amd.com/rocm/whl-multi-arch/ "rocm[libraries,devel]==${{ env.ROCM_VERSION }}"
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
+
+      - name: Setup ROCm Environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
+          # Expand the devel tree (idempotent; no-op if already done during install)
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
+          $rocmPath = (rocm-sdk path --root).Trim()
+          if (-not $rocmPath) { throw "rocm-sdk path --root returned empty - devel package may not be installed" }
+          $cmakePath = (rocm-sdk path --cmake).Trim()
+          $binPath = (rocm-sdk path --bin).Trim()
+          echo "ROCm root: $rocmPath"
+          echo "CMAKE_PREFIX_PATH=$cmakePath" >> $env:GITHUB_ENV
+          echo "HIP_PATH=$rocmPath" >> $env:GITHUB_ENV
+          echo "HIP_DEVICE_LIB_PATH=$rocmPath\lib\llvm\amdgcn\bitcode" >> $env:GITHUB_ENV
+          echo "HIP_PLATFORM=amd" >> $env:GITHUB_ENV
+          echo "LLVM_PATH=$rocmPath\lib\llvm" >> $env:GITHUB_ENV
+          echo "$binPath" >> $env:GITHUB_PATH
+          echo "C:\TheRock\build\.venv\Scripts" >> $env:GITHUB_PATH
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Unix Makefiles" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
+            -DGGML_BACKEND_DL=ON `
+            -DGGML_NATIVE=OFF `
+            -DGGML_CPU=ON `
+            -DGGML_CPU_ALL_VARIANTS=ON `
+            -DGGML_HIP=ON `
+            -DCMAKE_C_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
+            -DCMAKE_CXX_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang++.exe" `
+            -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
+            -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
+            -DHIP_PATH="${env:HIP_PATH}" `
+            -DAMDGPU_TARGETS="gfx1100"
+          cmake --build build --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
+
+      - name: Verify HIP backend was built
+        shell: pwsh
+        run: |
+          $hipDll = Get-ChildItem -Path build\bin -Filter "ggml-hip*.dll" -ErrorAction SilentlyContinue
+          if (-not $hipDll) {
+            Write-Host "##[error]ggml-hip*.dll was NOT produced. The HIP backend silently failed to build."
+            Get-ChildItem build\bin | Format-Table -AutoSize
+            exit 1
+          }
+          $hipDll | Format-Table FullName, Length -AutoSize
+
+      - name: Determine build tag
+        id: tag
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq 'tag') { "${{ github.ref_name }}".TrimStart('v') } else { "git-${{ github.sha }}".Substring(0, 7) }
+          echo "name=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Get ROCm short version
+        shell: pwsh
+        run: |
+          $rocmVersionShort = ('${{ env.ROCM_VERSION }}'.Split('.')[0..1] -join '.')
+          echo "ROCM_VERSION_SHORT=$rocmVersionShort" >> $env:GITHUB_ENV
+
+      - name: Pack artifacts
+        shell: pwsh
+        run: |
+          cp LICENSE build\bin\
+          7z a llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip .\build\bin\*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip
+          name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip
