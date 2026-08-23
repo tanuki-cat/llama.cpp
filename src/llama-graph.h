@@ -59,6 +59,7 @@ enum llm_ffn_op_type : int {
     LLM_FFN_GEGLU,
     LLM_FFN_REGLU,
     LLM_FFN_SWIGLU_OAI_MOE,
+    LLM_FFN_SITU,           // kimi-k3
 };
 
 enum llm_ffn_gate_type {
@@ -1324,6 +1325,8 @@ struct llm_graph_context {
     //
 
     void build_sampling() const;
+
+    virtual void build_post_sampling() const {}
 
     //
     // dense (out)
