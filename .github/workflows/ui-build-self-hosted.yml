@@ -1,8 +1,7 @@
 name: UI Build (self-hosted)
 
 on:
-  workflow_call:
-
+  workflow_dispatch: {}
 jobs:
   build:
     runs-on: [self-hosted, fast]
