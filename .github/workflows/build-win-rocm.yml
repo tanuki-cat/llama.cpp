@@ -53,6 +53,10 @@ jobs:
           echo "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" >> $env:GITHUB_ENV
           echo "C:\VulkanSDK\${env:VULKAN_VERSION}\bin" >> $env:GITHUB_PATH
 
+      - name: Install Ninja
+        shell: pwsh
+        run: choco install ninja
+
       - name: Setup ROCm Environment
         shell: pwsh
         run: |
@@ -77,7 +81,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          cmake -S . -B build -G "Unix Makefiles" `
+          cmake -S . -B build -G "Ninja" `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
             -DGGML_BACKEND_DL=ON `
@@ -92,7 +96,7 @@ jobs:
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
             -DHIP_PATH="${env:HIP_PATH}" `
             -DAMDGPU_TARGETS="gfx1100"
-          cmake --build build --config Release --parallel ${env:NUMBER_OF_PROCESSORS}
+          cmake --build build --parallel ${env:NUMBER_OF_PROCESSORS}
 
       - name: Verify HIP backend was built
         shell: pwsh
