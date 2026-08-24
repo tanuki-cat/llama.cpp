@@ -3,10 +3,11 @@ name: Build Windows ROCm
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    tags: ["v*"]
 
 env:
   ROCM_VERSION: "7.14.0"
+  VULKAN_VERSION: 1.4.357.0
 
 jobs:
   windows-rocm:
@@ -43,6 +44,15 @@ jobs:
           rocm-sdk init
           if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
 
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+          & "$env:RUNNER_TEMP/VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          echo "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" >> $env:GITHUB_ENV
+          echo "C:\VulkanSDK\${env:VULKAN_VERSION}\bin" >> $env:GITHUB_PATH
+
       - name: Setup ROCm Environment
         shell: pwsh
         run: |
@@ -75,6 +85,7 @@ jobs:
             -DGGML_CPU=ON `
             -DGGML_CPU_ALL_VARIANTS=ON `
             -DGGML_HIP=ON `
+            -DGGML_VULKAN=ON `
             -DCMAKE_C_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
             -DCMAKE_CXX_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang++.exe" `
             -DCMAKE_HIP_COMPILER="${env:HIP_PATH}\lib\llvm\bin\clang.exe" `
@@ -92,7 +103,14 @@ jobs:
             Get-ChildItem build\bin | Format-Table -AutoSize
             exit 1
           }
+          $vulkanDll = Get-ChildItem -Path build\bin -Filter "ggml-vulkan*.dll" -ErrorAction SilentlyContinue
+          if (-not $vulkanDll) {
+            Write-Host "##[error]ggml-vulkan*.dll was NOT produced. The Vulkan backend silently failed to build."
+            Get-ChildItem build\bin | Format-Table -AutoSize
+            exit 1
+          }
           $hipDll | Format-Table FullName, Length -AutoSize
+          $vulkanDll | Format-Table FullName, Length -AutoSize
 
       - name: Determine build tag
         id: tag
@@ -111,10 +129,10 @@ jobs:
         shell: pwsh
         run: |
           cp LICENSE build\bin\
-          7z a llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip .\build\bin\*
+          7z a llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-vulkan-${{ steps.tag.outputs.name }}.zip .\build\bin\*
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
-          path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip
-          name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-${{ steps.tag.outputs.name }}.zip
+          path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-vulkan-${{ steps.tag.outputs.name }}.zip
+          name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-gfx1100-vulkan-${{ steps.tag.outputs.name }}.zip
