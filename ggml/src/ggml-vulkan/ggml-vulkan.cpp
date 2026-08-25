@@ -7344,6 +7344,31 @@ static bool ggml_vk_instance_portability_enumeration_ext_available(const std::ve
 static bool ggml_vk_instance_debug_utils_ext_available(const std::vector<vk::ExtensionProperties> & instance_extensions);
 static bool ggml_vk_device_is_supported(const vk::PhysicalDevice & vkdev);
 
+// stable sort key for VulkanN numbering: vkEnumeratePhysicalDevices order is not
+// guaranteed across process launches, sort by PCI bus id (fallback: name)
+static std::tuple<std::string, std::string> ggml_vk_device_sort_key(const vk::PhysicalDevice & dev) {
+    std::vector<vk::ExtensionProperties> ext_props = dev.enumerateDeviceExtensionProperties();
+    bool pci_ext = false;
+    for (const auto & ext : ext_props) {
+        if (strcmp("VK_EXT_pci_bus_info", ext.extensionName) == 0) {
+            pci_ext = true;
+            break;
+        }
+    }
+    std::string pci_id;
+    if (pci_ext) {
+        vk::PhysicalDevicePCIBusInfoPropertiesEXT pci_bus_info = {};
+        vk::PhysicalDeviceProperties2 props2 = {};
+        props2.pNext = &pci_bus_info;
+        dev.getProperties2(&props2);
+        char pci_id_str[16] = {};
+        snprintf(pci_id_str, sizeof(pci_id_str), "%04x:%02x:%02x.%x",
+                 pci_bus_info.pciDomain, pci_bus_info.pciBus, pci_bus_info.pciDevice, pci_bus_info.pciFunction);
+        pci_id = pci_id_str;
+    }
+    return { pci_id, dev.getProperties().deviceName.data() };
+}
+
 static DispatchLoaderDynamic ggml_vk_default_dispatcher_instance;
 DispatchLoaderDynamic & ggml_vk_default_dispatcher() {
     return ggml_vk_default_dispatcher_instance;
@@ -7561,6 +7586,16 @@ static void ggml_vk_instance_init() {
                     }
                 }
             }
+        }
+
+        // keep VulkanN numbering stable across launches, driver enumeration order is not guaranteed
+        std::stable_sort(vk_instance.device_indices.begin(), vk_instance.device_indices.end(),
+            [&devices](size_t a, size_t b) {
+                return ggml_vk_device_sort_key(devices[a]) < ggml_vk_device_sort_key(devices[b]);
+            });
+        for (size_t i = 0; i < vk_instance.device_indices.size(); i++) {
+            VK_LOG_DEBUG("Vulkan" << i << " -> physical device index " << vk_instance.device_indices[i]
+                       << " (" << devices[vk_instance.device_indices[i]].getProperties().deviceName.data() << ")");
         }
 
         // If no GPUs found, fall back to the first non-CPU device.
