@@ -43,7 +43,7 @@ jobs:
         with:
           key: cuda-ubuntu-24.04-cuda
           folder: llama.cpp
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
 
       - name: Build with CMake
         # TODO: Remove GGML_CUDA_CUB_3DOT2 flag once CCCL 3.2 is bundled within CTK and that CTK version is used in this project
@@ -67,7 +67,7 @@ jobs:
           key: cuda-ubuntu-24.04-cuda
           folder: llama.cpp
           evict-old-files: 1d
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
           save: true
 
   hip:
@@ -98,7 +98,7 @@ jobs:
         with:
           key: cuda-ubuntu-22.04-hip
           folder: llama.cpp
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
 
       - name: Build with native CMake HIP support
         id: cmake_build
@@ -118,7 +118,7 @@ jobs:
           key: cuda-ubuntu-22.04-hip
           folder: llama.cpp
           evict-old-files: 1d
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
           save: true
 
   musa:
@@ -149,7 +149,7 @@ jobs:
         with:
           key: cuda-ubuntu-22.04-musa
           folder: llama.cpp
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
 
       - name: Build with native CMake MUSA support
         id: cmake_build
@@ -167,5 +167,5 @@ jobs:
           key: cuda-ubuntu-22.04-musa
           folder: llama.cpp
           evict-old-files: 1d
-          hf_bucket: ${{ vars.HF_BUCKET_CACHE_OUTPUT }}
+          hf_bucket: ggml-org/cache
           save: true
