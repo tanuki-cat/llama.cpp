@@ -138,14 +138,13 @@ jobs:
           # binaries (exe directory is searched before System32) so the correct
           # runtime is used.
           # See https://github.com/ggml-org/llama.cpp/issues/26929 (ROCm 7 amdhip64_7.dll).
+          # rocm-sdk is on PATH from the Setup ROCm Environment step (GITHUB_PATH)
           $binPath = (rocm-sdk path --bin).Trim()
           if (-not $binPath) { throw "rocm-sdk path --bin returned empty" }
           # amdhip64 is required; kpack/comgr are ROCm-version dependent, copy what exists
           $required = "amdhip64*.dll"
-          $files = Get-ChildItem -Path $binPath -Filter $required -ErrorAction SilentlyContinue
-          if (-not $files) { throw "no match for $required in $binPath" }
-          $optional = @("rocm_kpack*.dll", "amd_comgr*.dll")
-          foreach ($pattern in ($required, $optional)) {
+          if (-not (Get-ChildItem -Path $binPath -Filter $required -ErrorAction SilentlyContinue)) { throw "no match for $required in $binPath" }
+          foreach ($pattern in @($required, "rocm_kpack*.dll", "amd_comgr*.dll")) {
             Get-ChildItem -Path $binPath -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
               Copy-Item $_.FullName -Destination build\bin -Force
               write-host "  copied $($_.Name)"
