@@ -1,0 +1,154 @@
+name: Build Windows ROCm 10
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+env:
+  ROCM_VERSION: "10.0.0"
+  ROCM_INDEX: "https://stable.repo.amd.com/rocm/whl-next/"
+  VULKAN_VERSION: 1.4.357.0
+  AMDGPU_TARGET: gfx1100
+
+jobs:
+  windows-rocm10:
+    name: windows-rocm10 (gfx1100 / RX 7900 XTX)
+    runs-on: windows-2022
+
+    permissions:
+      actions: write
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Cache ROCm Installation
+        id: cache-rocm
+        uses: actions/cache@v5
+        with:
+          path: C:\TheRock\build
+          key: rocm-wheels-${{ env.ROCM_VERSION }}-multi-arch-${{ runner.os }}
+
+      - name: Install ROCm with Wheels
+        if: steps.cache-rocm.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -Path "C:\TheRock\build" -ItemType Directory -Force | Out-Null
+          python -m venv C:\TheRock\build\.venv
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          # ROCm 10 multi-arch: compiler+libs from 'devel'/'libraries', GPU code via device extra
+          python -m pip install --index-url "${{ env.ROCM_INDEX }}" "rocm[libraries,devel,device-${{ env.AMDGPU_TARGET }}]==${{ env.ROCM_VERSION }}"
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
+
+      - name: Install Vulkan SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          curl.exe -o $env:RUNNER_TEMP/VulkanSDK-Installer.exe -L "https://sdk.lunarg.com/sdk/download/${env:VULKAN_VERSION}/windows/vulkansdk-windows-X64-${env:VULKAN_VERSION}.exe"
+          & "$env:RUNNER_TEMP/VulkanSDK-Installer.exe" --accept-licenses --default-answer --confirm-command install
+          echo "VULKAN_SDK=C:\VulkanSDK\${env:VULKAN_VERSION}" >> $env:GITHUB_ENV
+          echo "C:\VulkanSDK\${env:VULKAN_VERSION}\bin" >> $env:GITHUB_PATH
+
+      - name: Install Ninja
+        shell: pwsh
+        run: choco install ninja
+
+      - name: Setup ROCm Environment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          & C:\TheRock\build\.venv\Scripts\Activate.ps1
+          # Expand the devel tree (idempotent; no-op if already done during install)
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "rocm-sdk init failed with exit code $LASTEXITCODE" }
+          $rocmPath = (rocm-sdk path --root).Trim()
+          if (-not $rocmPath) { throw "rocm-sdk path --root returned empty - devel package may not be installed" }
+          $cmakePath = (rocm-sdk path --cmake).Trim()
+          $binPath = (rocm-sdk path --bin).Trim()
+          echo "ROCm root: $rocmPath"
+          echo "CMAKE_PREFIX_PATH=$cmakePath" >> $env:GITHUB_ENV
+          echo "HIP_PATH=$rocmPath" >> $env:GITHUB_ENV
+          echo "HIP_DEVICE_LIB_PATH=$rocmPath\lib\llvm\amdgcn\bitcode" >> $env:GITHUB_ENV
+          echo "HIP_PLATFORM=amd" >> $env:GITHUB_ENV
+          echo "LLVM_PATH=$rocmPath\lib\llvm" >> $env:GITHUB_ENV
+          echo "$binPath" >> $env:GITHUB_PATH
+          echo "C:\TheRock\build\.venv\Scripts" >> $env:GITHUB_PATH
+          # Compiler location varies across ROCm releases; probe bin first, fall back to lib\llvm\bin
+          $clang = Join-Path $binPath "clang.exe"
+          if (-not (Test-Path $clang)) { $clang = Join-Path $rocmPath "lib\llvm\bin\clang.exe" }
+          $clangpp = Join-Path (Split-Path $clang) "clang++.exe"
+          if (-not (Test-Path $clang)) { throw "clang.exe not found under $rocmPath (tried bin and lib\llvm\bin)" }
+          if (-not (Test-Path $clangpp)) { throw "clang++.exe not found next to $clang" }
+          echo "CMAKE_C_COMPILER=$clang" >> $env:GITHUB_ENV
+          echo "CMAKE_CXX_COMPILER=$clangpp" >> $env:GITHUB_ENV
+          echo "CMAKE_HIP_COMPILER=$clang" >> $env:GITHUB_ENV
+          Write-Host "clang: $clang"
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake -S . -B build -G "Ninja" `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="${env:HIP_PATH}" `
+            -DGGML_BACKEND_DL=ON `
+            -DGGML_NATIVE=OFF `
+            -DGGML_CPU=ON `
+            -DGGML_CPU_ALL_VARIANTS=ON `
+            -DGGML_HIP=ON `
+            -DGGML_VULKAN=ON `
+            -DCMAKE_C_COMPILER="${env:CMAKE_C_COMPILER}" `
+            -DCMAKE_CXX_COMPILER="${env:CMAKE_CXX_COMPILER}" `
+            -DCMAKE_HIP_COMPILER="${env:CMAKE_HIP_COMPILER}" `
+            -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
+            -DHIP_PATH="${env:HIP_PATH}" `
+            -DAMDGPU_TARGETS="${env:AMDGPU_TARGET}"
+          cmake --build build --parallel ${env:NUMBER_OF_PROCESSORS}
+
+      - name: Verify HIP backend was built
+        shell: pwsh
+        run: |
+          $hipDll = Get-ChildItem -Path build\bin -Filter "ggml-hip*.dll" -ErrorAction SilentlyContinue
+          if (-not $hipDll) {
+            Write-Host "##[error]ggml-hip*.dll was NOT produced. The HIP backend silently failed to build."
+            Get-ChildItem build\bin | Format-Table -AutoSize
+            exit 1
+          }
+          $vulkanDll = Get-ChildItem -Path build\bin -Filter "ggml-vulkan*.dll" -ErrorAction SilentlyContinue
+          if (-not $vulkanDll) {
+            Write-Host "##[error]ggml-vulkan*.dll was NOT produced. The Vulkan backend silently failed to build."
+            Get-ChildItem build\bin | Format-Table -AutoSize
+            exit 1
+          }
+          $hipDll | Format-Table FullName, Length -AutoSize
+          $vulkanDll | Format-Table FullName, Length -AutoSize
+
+      - name: Determine build tag
+        id: tag
+        shell: pwsh
+        run: |
+          $tag = if ("${{ github.ref_type }}" -eq 'tag') { "${{ github.ref_name }}".TrimStart('v') } else { "git-${{ github.sha }}".Substring(0, 7) }
+          echo "name=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Get ROCm short version
+        shell: pwsh
+        run: |
+          $rocmVersionShort = ('${{ env.ROCM_VERSION }}'.Split('.')[0..1] -join '.')
+          echo "ROCM_VERSION_SHORT=$rocmVersionShort" >> $env:GITHUB_ENV
+
+      - name: Pack artifacts
+        shell: pwsh
+        run: |
+          cp LICENSE build\bin\
+          7z a llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ env.AMDGPU_TARGET }}-vulkan-${{ steps.tag.outputs.name }}.zip .\build\bin\*
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ env.AMDGPU_TARGET }}-vulkan-${{ steps.tag.outputs.name }}.zip
+          name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ env.AMDGPU_TARGET }}-vulkan-${{ steps.tag.outputs.name }}.zip
