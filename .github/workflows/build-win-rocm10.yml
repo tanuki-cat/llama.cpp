@@ -128,6 +128,30 @@ jobs:
           $hipDll | Format-Table FullName, Length -AutoSize
           $vulkanDll | Format-Table FullName, Length -AutoSize
 
+      - name: Bundle HIP runtime DLLs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # ggml-hip.dll loads amdhip64 at run time. The Adrenalin driver ships an
+          # amdhip64 dll in System32, which the loader searches before PATH, so a
+          # matching dll from PATH cannot win. Copy the ROCm 10 runtime next to the
+          # binaries (exe directory is searched before System32) so the correct
+          # runtime is used.
+          # See https://github.com/ggml-org/llama.cpp/issues/26929 (ROCm 7 amdhip64_7.dll).
+          $binPath = (rocm-sdk path --bin).Trim()
+          if (-not $binPath) { throw "rocm-sdk path --bin returned empty" }
+          # amdhip64 is required; kpack/comgr are ROCm-version dependent, copy what exists
+          $required = "amdhip64*.dll"
+          $files = Get-ChildItem -Path $binPath -Filter $required -ErrorAction SilentlyContinue
+          if (-not $files) { throw "no match for $required in $binPath" }
+          $optional = @("rocm_kpack*.dll", "amd_comgr*.dll")
+          foreach ($pattern in ($required, $optional)) {
+            Get-ChildItem -Path $binPath -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+              Copy-Item $_.FullName -Destination build\bin -Force
+              write-host "  copied $($_.Name)"
+            }
+          }
+
       - name: Determine build tag
         id: tag
         shell: pwsh
