@@ -78,7 +78,7 @@ jobs:
           path: tools/ui/dist
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-${{ matrix.os }}-${{ matrix.arch }}
 
@@ -162,7 +162,7 @@ jobs:
 
       - name: ccache
         if: ${{ matrix.build != 's390x' }}
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-${{ matrix.os }}-cpu
 
@@ -247,7 +247,7 @@ jobs:
           fi
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-${{ matrix.os }}-vulkan
 
@@ -333,7 +333,7 @@ jobs:
       #   cache on:  https://github.com/ggerganov/tmp2/actions/runs/26534713799/job/78224189394
       #
       #- name: ccache
-      #  uses: ggml-org/ccache-action@v1.2.21
+      #  uses: ggml-org/ccache-action@v1.2.24
       #  with:
       #    key: release-android-arm64
 
@@ -411,7 +411,7 @@ jobs:
           path: tools/ui/dist
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-ubuntu-24.04-openvino-release-no-preset-v1
 
@@ -526,7 +526,7 @@ jobs:
           path: tools/ui/dist
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-windows-2022-openvino
           variant: ccache
@@ -654,7 +654,7 @@ jobs:
           choco install ninja
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-windows-2025-vs2026-${{ matrix.arch }}-cpu
 
@@ -716,7 +716,7 @@ jobs:
           choco install ninja
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: windows-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
@@ -898,7 +898,7 @@ jobs:
 
       # TODO: these jobs need to use llvm toolchain in order to utilize the ccache
       #- name: ccache
-      #  uses: ggml-org/ccache-action@v1.2.21
+      #  uses: ggml-org/ccache-action@v1.2.24
       #  with:
       #    key: release-windows-2025-${{ matrix.arch }}-${{ matrix.backend }}
 
@@ -986,7 +986,7 @@ jobs:
           choco install ninja
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-windows-2022-${{ matrix.arch }}-cuda-${{ matrix.cuda }}
 
@@ -1082,7 +1082,7 @@ jobs:
           "LEVEL_ZERO_V1_SDK_PATH=C:/level-zero-sdk" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-windows-2022-x64-sycl
 
@@ -1200,7 +1200,7 @@ jobs:
           path: tools/ui/dist
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-ubuntu-24.04-sycl-${{ matrix.build }}
 
@@ -1277,7 +1277,7 @@ jobs:
           tool-cache: true
 
       - name: ccache
-        uses: ggml-org/ccache-action@v1.2.21
+        uses: ggml-org/ccache-action@v1.2.24
         with:
           key: release-ubuntu-24.04-rocm-${{ matrix.ROCM_VERSION }}-${{ matrix.build }}
           evict-old-files: 1d
