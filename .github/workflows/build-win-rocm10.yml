@@ -90,6 +90,13 @@ jobs:
           echo "CMAKE_HIP_COMPILER=$clang" >> $env:GITHUB_ENV
           Write-Host "clang: $clang"
 
+      - name: ccache
+        uses: ggml-org/ccache-action@v1.2.24
+        with:
+          key: win-rocm10-${{ env.ROCM_VERSION }}-${{ env.AMDGPU_TARGET }}
+          evict-old-files: 1d
+          max-size: "1G"
+
       - name: Build
         shell: pwsh
         run: |
@@ -106,6 +113,7 @@ jobs:
             -DCMAKE_CXX_COMPILER="${env:CMAKE_CXX_COMPILER}" `
             -DCMAKE_HIP_COMPILER="${env:CMAKE_HIP_COMPILER}" `
             -DCMAKE_C_FLAGS="-Wno-error=incompatible-pointer-types" `
+            -DLLAMA_BUILD_BORINGSSL=ON `
             -DHIP_PATH="${env:HIP_PATH}" `
             -DAMDGPU_TARGETS="${env:AMDGPU_TARGET}"
           cmake --build build --parallel ${env:NUMBER_OF_PROCESSORS}
@@ -175,3 +183,8 @@ jobs:
         with:
           path: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ env.AMDGPU_TARGET }}-vulkan-${{ steps.tag.outputs.name }}.zip
           name: llama-bin-win-rocm-${{ env.ROCM_VERSION_SHORT }}-${{ env.AMDGPU_TARGET }}-vulkan-${{ steps.tag.outputs.name }}.zip
+
+      - name: ccache-clear
+        uses: ./.github/actions/ccache-clear
+        with:
+          key: win-rocm10-${{ env.ROCM_VERSION }}-${{ env.AMDGPU_TARGET }}
