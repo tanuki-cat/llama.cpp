@@ -39,7 +39,7 @@ jobs:
       - name: ccache-buckets-restore
         uses: ./.github/actions/ccache-buckets
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN_CACHE_OUTPUT }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN_CI }}
         with:
           key: cuda-ubuntu-24.04-cuda
           folder: llama.cpp
@@ -94,7 +94,7 @@ jobs:
       - name: ccache-buckets-restore
         uses: ./.github/actions/ccache-buckets
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN_CACHE_OUTPUT }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN_CI }}
         with:
           key: cuda-ubuntu-22.04-hip
           folder: llama.cpp
@@ -145,7 +145,7 @@ jobs:
       - name: ccache-buckets-restore
         uses: ./.github/actions/ccache-buckets
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN_CACHE_OUTPUT }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN_CI }}
         with:
           key: cuda-ubuntu-22.04-musa
           folder: llama.cpp
