@@ -186,5 +186,7 @@ jobs:
 
       - name: ccache-clear
         uses: ./.github/actions/ccache-clear
+        env:
+          GH_TOKEN: ${{ github.token }}
         with:
           key: win-rocm10-${{ env.ROCM_VERSION }}-${{ env.AMDGPU_TARGET }}
