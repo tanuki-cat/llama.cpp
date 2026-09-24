@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   server:
-    runs-on: hf-jobs-cpu-upgrade
+    runs-on: hf-jobs-cpu-xl
 
     strategy:
       matrix:
