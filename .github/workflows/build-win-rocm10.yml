@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
 
 env:
-  ROCM_VERSION: "10.0.0"
+  ROCM_VERSION: "10.1.0"
   ROCM_INDEX: "https://stable.repo.amd.com/rocm/whl-next/"
   VULKAN_VERSION: 1.4.357.0
   AMDGPU_TARGET: gfx1100
