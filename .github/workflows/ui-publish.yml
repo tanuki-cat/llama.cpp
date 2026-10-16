@@ -1,6 +1,16 @@
 name: UI Publish
 
 on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Version tag to publish under (e.g., b1234)'
+        required: true
+        type: string
+      run_id:
+        description: 'Run ID of the UI build run whose artifact will be downloaded'
+        required: true
+        type: string
   workflow_call:
     inputs:
       version_tag:
@@ -8,8 +18,9 @@ on:
         required: true
         type: string
       run_id:
+        description: 'Run ID of the UI build run whose artifact will be downloaded'
         required: true
-        type: number
+        type: string
     secrets:
       hf_token:
         description: 'Hugging Face token with write access'

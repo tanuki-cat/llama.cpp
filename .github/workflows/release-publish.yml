@@ -1,15 +1,23 @@
 name: Publish Release
 
 on:
-  workflow_run:
-    workflows:
-      - Release
-    types:
-      - completed
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Release workflow run ID whose artifacts will be published'
+        required: true
+        type: string
+      head_sha:
+        description: 'Commit SHA the release was built from'
+        required: true
+        type: string
+      commit_message:
+        description: 'Commit message of the release commit (used for the [no release] check)'
+        required: false
+        type: string
+        default: ''
 
-run-name: "Publish ${{ github.event.workflow_run.display_title }}"
+run-name: "Publish Release"
 
 cache-mode: none
 permissions:
@@ -22,8 +30,6 @@ env:
 
 jobs:
   publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
     # Fine-grained permission
     # https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#modifying-the-permissions-for-the-github_token
     permissions:
@@ -41,7 +47,7 @@ jobs:
     steps:
       - id: check
         env:
-          COMMIT_MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
+          COMMIT_MESSAGE: ${{ inputs.commit_message }}
         run: |
           if echo "$COMMIT_MESSAGE" | grep -q '\[no release\]'; then
             echo "should_release=false" >> $GITHUB_OUTPUT
@@ -54,7 +60,7 @@ jobs:
         id: checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.head_sha }}
           fetch-depth: 0
           ssh-key: ${{ secrets.DEPLOY_KEY_RELEASE }}
 
@@ -69,7 +75,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: ./artifact
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.run_id }}
           github-token: ${{ github.token }}
           merge-multiple: true
           skip-decompress: true
@@ -123,7 +129,7 @@ jobs:
         with:
           name: llama-ui.zip
           path: ./ui-dist
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ inputs.run_id }}
           github-token: ${{ github.token }}
 
       - name: Package UI
@@ -147,12 +153,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.tag.outputs.name }}
-          commitish: ${{ github.event.workflow_run.head_sha }}
+          commitish: ${{ inputs.head_sha }}
           prerelease: true
           body: |
             <details open>
 
-            ${{ github.event.workflow_run.head_commit.message }}
+            ${{ inputs.commit_message }}
 
             </details>
 
@@ -242,6 +248,6 @@ jobs:
     uses: ./.github/workflows/ui-publish.yml
     with:
       version_tag: ${{ needs.publish.outputs.tag_name }}
-      run_id: ${{ github.event.workflow_run.id }}
+      run_id: ${{ inputs.run_id }}
     secrets:
       hf_token: ${{ secrets.HF_TOKEN_UI_STATIC_OUTPUT }}

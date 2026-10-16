@@ -1,6 +1,7 @@
 name: UI Build (self-hosted)
 
 on:
+  workflow_dispatch:
   workflow_call:
 
 cache-mode: none
