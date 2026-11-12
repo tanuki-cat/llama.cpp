@@ -2,8 +2,6 @@ name: CI (apple - daily)
 
 on:
   workflow_dispatch: # allows manual triggering
-  schedule:
-    - cron: '0 0 * * *'
 
 cache-mode: none
 permissions:
