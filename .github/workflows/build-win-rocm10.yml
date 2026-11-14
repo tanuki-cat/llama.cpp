@@ -95,6 +95,35 @@ jobs:
           evict-old-files: 1d
           max-size: "1G"
 
+      - name: Add Windows SDK tools to PATH
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          # lld-link needs mt.exe to merge the app manifest that cmake/win-app.cmake embeds
+          # into every Windows exe. The ROCm clang toolchain does not put the Windows SDK
+          # bin dir on PATH, unlike a MSVC developer prompt, so linking fails with
+          # "unable to find mt.exe in PATH".
+          $sdkBin = "C:\Program Files (x86)\Windows Kits\10\bin"
+          if (-not (Test-Path $sdkBin)) { throw "Windows SDK bin dir not found: $sdkBin" }
+
+          # pick the newest versioned <sdk>\bin\<version>\x64\mt.exe, else any x64 one
+          $best = $null
+          $fallback = $null
+          $candidates = Get-ChildItem -Path $sdkBin -Filter "mt.exe" -Recurse -ErrorAction SilentlyContinue
+          foreach ($f in $candidates) {
+            if ($f.FullName -notmatch '\\x64\\mt\.exe$') { continue }
+            if (-not $fallback) { $fallback = $f.FullName }
+            if ($f.FullName -match '\\bin\\(\d+(?:\.\d+){1,3})\\x64\\mt\.exe$') {
+              $v = [version]$Matches[1]
+              if (-not $best -or $v -gt $best.version) { $best = [pscustomobject]@{ version = $v; path = $f.FullName } }
+            }
+          }
+          $mtExe = if ($best) { $best.path } else { $fallback }
+          if (-not $mtExe) { throw "mt.exe not found under $sdkBin" }
+
+          Write-Host "mt.exe: $mtExe"
+          echo "$(Split-Path $mtExe)" >> $env:GITHUB_PATH
+
       - name: Build
         shell: pwsh
         run: |
