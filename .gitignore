@@ -152,5 +152,4 @@ a.out.*
 # AGENTS
 
 AGENTS.local.md
-.pi/
-.pi-glla/
+.pi/SYSTEM.md

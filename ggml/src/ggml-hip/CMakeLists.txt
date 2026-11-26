@@ -113,14 +113,6 @@ if (GGML_HIP_EXPORT_METRICS)
     set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -Rpass-analysis=kernel-resource-usage --save-temps")
 endif()
 
-# Fast math for HIP, like CUDA's -use_fast_math. Not -ffast-math: that implies -ffinite-math-only, which breaks ggml's INFINITY masking and produces NaNs.
-# -funsafe-math-optimizations enables -fassociative-math, which reassociates FP reductions and can
-# perturb greedy argmax (e.g. MTP speculative-decode output diverging from baseline), so it is gated
-# behind GGML_HIP_UNSAFE_MATH (default OFF).
-if (GGML_HIP_UNSAFE_MATH)
-    set(CMAKE_HIP_FLAGS "${CMAKE_HIP_FLAGS} -funsafe-math-optimizations")
-endif()
-
 if (NOT GGML_CUDA_FA)
     add_compile_definitions(GGML_CUDA_NO_FA)
 endif()

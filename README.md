@@ -1,9 +1,3 @@
-# Deprecation warning
->
-> [!CAUTION]
-> The ROCm/llama.cpp repository is retired, please use the [upstream](https://github.com/ggml-org/llama.cpp) repository
->
-
 # llama.cpp
 
 ![llama.cpp](https://raw.githubusercontent.com/ggml-org/llama-brand/refs/heads/master/logo/svg/cover/llama-cpp/cover-llama-cpp-dark.svg)
@@ -41,7 +35,7 @@ curl -LsSf https://llama.app/install.sh | sh
 irm https://llama.app/install.ps1 | iex
 ```
 
-- Visit <https://llama.app> and follow the instructions
+- Visit https://llama.app and follow the instructions
 - Run with Docker - see our [Docker documentation](docs/docker.md)
 - Download pre-built binaries from the [releases page](https://github.com/ggml-org/llama.cpp/releases)
 - Build from source by cloning this repository - check out [our build guide](docs/build.md)
