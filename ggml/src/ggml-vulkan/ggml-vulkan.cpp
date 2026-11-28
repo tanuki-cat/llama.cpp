@@ -13261,6 +13261,13 @@ void ggml_vk_conv_3d(ggml_backend_vk_context * ctx, vk_context & subctx, const g
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type == GGML_TYPE_F32);
 
+    if (ggml_is_empty(src0)) {
+        const vk_subbuffer dst_buf = ggml_vk_tensor_subbuffer(ctx, dst, true);
+        const size_t size = ggml_nbytes(dst);
+        subctx->s->buffer->buf.fillBuffer(dst_buf.buffer->buffer, dst_buf.offset + dst_buf.size - size, size, 0);
+        return;
+    }
+
     GGML_TENSOR_BINARY_OP_LOCALS
     GGML_ASSERT(nb00 == sizeof(float) || nb00 == sizeof(ggml_fp16_t));
     GGML_ASSERT(nb10 == sizeof(float));
@@ -16727,6 +16734,10 @@ static ggml_backend_t ggml_backend_vk_device_init(ggml_backend_dev_t dev, const 
 static bool ggml_backend_vk_device_supports_op(ggml_backend_dev_t dev, const ggml_tensor * op) {
     ggml_backend_vk_device_context * ctx = (ggml_backend_vk_device_context *)dev->context;
     const vk_device& device = ggml_vk_get_device(ctx->device);
+
+    if (ggml_get_src_scale(op, 0)) {
+        return false;
+    }
 
     const bool uses_bda = (op->op == GGML_OP_IM2COL || op->op == GGML_OP_IM2COL_3D) &&
                           device->shader_int64 && device->buffer_device_address;
